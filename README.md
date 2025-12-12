@@ -7,7 +7,8 @@
 
 ## 1. Постановка задачи
 - **Задача:** трёхклассовая классификация изображений (классы `down`, `one`, `up`).  
-- **Датасет:** набор фотографий (скриншотов) трёх поз/жестов персонажа из видеоигры [Night in the Woods](http://www.nightinthewoods.com); исходные примеры (без аугментаций):
+- **Датасет:** набор фотографий (скриншотов) трёх поз/жестов персонажа из видеоигры [Night in the Woods](http://www.nightinthewoods.com).
+- **Примеры файлов ДО предобработки и аугментаций:**
 
 | Класс `down` | Класс `one` | Класс `up` |
 |:---:|:---:|:---:|
@@ -29,17 +30,20 @@
   - локальный зум,
   - лёгкий гауссов шум / размытие / резкость,
   - контраст/гистограмма, случайное выбрасывание пикселей.
+
 - **Предобработка:** все изображения приводятся к квадратному виду и единому размеру (256×256) с сохранением соотношения сторон и добавлением паддинга (отступа вокруг изображения) — для того, чтобы признаки (HOG, Hu, HSV) были вычислимы в однотипном пространстве признаков и масштаб признаков не зависел от исходного размера.
+
 - **Команды (pipeline):**
   1. Аугментация:
 	 ```
 	 python3 scripts/augment.py --input_dir datasets/raw --output_dir dataset/raw --num_aug 9
 	 ```
-  2. Предобработка (resize + pad -> processed):
+  2. Предобработка (resize + padding → processed):
      ```
      python3 scripts/preprocess.py --raw_dir datasets/raw --output_dir datasets/processed --img_size 256
      ```
   3. (Ручной шаг) часть файлов из `train` была перемещена в `test`, чтобы получить итоговый небольшой тестовый набор.
+
 - **Примеры файлов ПОСЛЕ предобработки и аугментаций:**
 
 | Класс `down` | Класс `one` | Класс `up` |
@@ -54,17 +58,18 @@
 
 ### Описание методов:
 
-- **kNN (k-Nearest Neighbors):** присваивание метки по большинству среди k ближайших соседей в пространстве признаков (обычно евклидово расстояние).  
-- **SVM (Support Vector Machine, RBF ядро):** максимизация разделяющей полосы с регуляризацией; с RBF-ядром классификация становится нелинейной:
+- **kNN (k-Nearest Neighbors):** присваивание метки по большинству среди k ближайших соседей в пространстве признаков (обычно евклидово расстояние).
+
+- **Нелинейный SVM (Support Vector Machine, метод опорных векторов):** максимизация разделяющей полосы с регуляризацией; с RBF-ядром классификация становится нелинейной:
   \[
   K(x, x')=\exp(-\gamma\|x-x'\|^2).
   \]
   Решающая задача включает параметр `C` — жёсткость штрафа за ошибки.
 
 ### Реализация и гиперпараметры:
-- Библиотека: `scikit-learn`.
+- Библиотека: [scikit-learn](https://scikit-learn.org/stable/index.html).
 - В коде (`train.py`):
-  - kNN:
+	- kNN:
 
 	```
 	from sklearn.neighbors import KNeighborsClassifier
@@ -72,7 +77,7 @@
 	KNeighborsClassifier(n_neighbors=5)
 	```
 
-  - SVM: 
+	- SVM: 
 
 	```
 	from sklearn.svm import SVC
@@ -81,17 +86,17 @@
 	```
 
 - Оценка: 5-fold Stratified cross-validation (`sklearn.model_selection.StratifiedKFold`) — средняя accuracy и std.
-- Команды запуска:
+- Команды запуска (pipeline):
 
 	```bash
    python3 scripts/train.py --data_dir datasets/processed/train --models_dir models
    python3 scripts/test.py  --data_dir datasets/processed/test  --models_dir models --out_dir reports
 	```
   
-### Результаты (финальный датасет из репозитория):
+### Результаты (на финальном датасете из репозитория):
 
-- kNN CV / test accuracy: в эксперименте тестовой accuracy ≈ 0.81  
-- SVM CV / test accuracy: ≈ 0.93 / 0.95  
+- kNN CV / test accuracy: ≈ 0.81  
+- SVM CV / test accuracy: ≈ 0.95  
   (точные числа — в разделе “Итоги” и в выводе консоли ниже)
 
 ---
@@ -102,7 +107,7 @@
 Ансамбль решающих деревьев, каждое дерево обучается на бутстреп-выборке и при разбиении узлов рассматривается случайное подмножество признаков; итог — голосование деревьев.
 
 ### Реализация и гиперпараметры:
-- Библиотека: `scikit-learn`.
+- Библиотека: [scikit-learn](https://scikit-learn.org/stable/index.html).
 - В коде (`train.py`):
 
 	```
@@ -113,30 +118,83 @@
 
 - Оценка: как и для SVM — 5-fold stratified CV + тест на отложенной выборке.
 - **Результаты:** RF показал наилучшие результаты на train и близкие лучшие результаты на тесте (в ряде запусков RF и SVM дают примерно одинаковую высокую точность).
-
-		Примечание: пайплайн запуска для RF тот же, что в разделе 3 (train/test). Всё остальное — повторяется.
+- Команды запуска (pipeline) — тот же, что и в разделе 3.
 
 ---
 
 ## 5. Итоговые результаты
 
-- **Вывод:** RandomForest (RF) показал наилучшие результаты среди протестированных методов; SVM также даёт высокие показатели; kNN уступает (но остаётся полезным как простой baseline).
-- **Пример CSV (фрагмент `reports/.../test_predictions.csv`):**
+### Вывод:
 
-| filename                  | true_label | pred_kNN | pred_SVM | pred_RandomForest |
-|--------------------------:|:----------:|:--------:|:--------:|:-----------------:|
-| down_1_proc256.jpeg       | down       | down     | down     | down              |
-| one_7_proc256.jpeg        | one        | one      | one      | one               |
-| up_2_proc256.jpeg         | up         | up       | up       | up                |
-| down_7_aug4_proc256.jpeg  | down       | down     | down     | down              |
+RandomForest (RF) показал наилучшие результаты среди протестированных методов, ложно предсказав класс лишь для одного изображения из тестовой выборки; SVM также даёт высокие показатели; kNN уступает (но остаётся полезным как простой baseline).
 
-*(Это демонстрационный фрагмент; полный CSV сохраняется в `reports/.../test_predictions.csv`.)*
+### Конкретные результаты:
 
-- **Вывод в консоли (пример, запуск `python3 scripts/test.py` на финальном датасете):**
-```text
+- **Пример CSV** (`reports/test_predictions.csv`):
+
+| filename | true\_label | pred\_kNN | pred\_SVM | pred\_RandomForest |
+| --: | :-- | :-- | :-- | :-- |
+| down\_1\_aug1\_proc256\.jpeg | down | down | down | down |
+| down\_2\_aug1\_proc256\.jpeg | down | down | down | down |
+| down\_3\_aug1\_proc256\.jpeg | down | down | down | down |
+| down\_4\_aug1\_proc256\.jpeg | down | down | down | down |
+| down\_5\_aug1\_proc256\.jpeg | down | down | down | down |
+| down\_6\_aug1\_proc256\.jpeg | down | down | down | down |
+| down\_7\_aug1\_proc256\.jpeg | down | down | down | down |
+| one\_1\_aug1\_proc256\.jpeg | one | one | one | one |
+| one\_2\_aug1\_proc256\.jpeg | one | down | one | one |
+| one\_3\_aug1\_proc256\.jpeg | one | one | one | one |
+| one\_4\_aug1\_proc256\.jpeg | one | down | down | down |
+| one\_5\_aug1\_proc256\.jpeg | one | one | one | one |
+| one\_6\_aug1\_proc256\.jpeg | one | one | one | one |
+| one\_7\_aug1\_proc256\.jpeg | one | one | one | one |
+| up\_1\_aug1\_proc256\.jpeg | up | up | up | up |
+| up\_2\_aug1\_proc256\.jpeg | up | up | up | up |
+| up\_3\_aug1\_proc256\.jpeg | up | up | up | up |
+| up\_4\_aug1\_proc256\.jpeg | up | up | up | up |
+| up\_5\_aug1\_proc256\.jpeg | up | one | up | up |
+| up\_6\_aug1\_proc256\.jpeg | up | down | up | up |
+| up\_7\_aug1\_proc256\.jpeg | up | up | up | up |
+
+- **Вывод в консоли** (пример запуска `python3 scripts/test.py` на финальном датасете):
+
+```
+$ python3 test.py --data_dir ../dataset/processed/test --models_dir ../models --out_dir ../reports
+
 Loaded 21 test images, classes: ['down', 'one', 'up']
 kNN test accuracy: 0.810
-SVM test accuracy: 0.952
-RandomForest test accuracy: 0.952
+Pred counts: Counter({np.str_('down'): 10, np.str_('one'): 6, np.str_('up'): 5})
+              precision    recall  f1-score   support
 
-Saved predictions CSV to reports/<folder>/test_predictions.csv
+        down      0.700     1.000     0.824         7
+         one      0.833     0.714     0.769         7
+          up      1.000     0.714     0.833         7
+
+    accuracy                          0.810        21
+   macro avg      0.844     0.810     0.809        21
+weighted avg      0.844     0.810     0.809        21
+
+SVM test accuracy: 0.952
+Pred counts: Counter({np.str_('down'): 8, np.str_('up'): 7, np.str_('one'): 6})
+              precision    recall  f1-score   support
+
+        down      0.875     1.000     0.933         7
+         one      1.000     0.857     0.923         7
+          up      1.000     1.000     1.000         7
+
+    accuracy                          0.952        21
+   macro avg      0.958     0.952     0.952        21
+weighted avg      0.958     0.952     0.952        21
+
+RandomForest test accuracy: 0.952
+Pred counts: Counter({np.str_('down'): 8, np.str_('up'): 7, np.str_('one'): 6})
+              precision    recall  f1-score   support
+
+        down      0.875     1.000     0.933         7
+         one      1.000     0.857     0.923         7
+          up      1.000     1.000     1.000         7
+
+    accuracy                          0.952        21
+   macro avg      0.958     0.952     0.952        21
+weighted avg      0.958     0.952     0.952        21
+```
