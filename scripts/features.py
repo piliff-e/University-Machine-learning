@@ -1,11 +1,14 @@
+#!/usr/bin/env python3
 """
-Единая реализация извлечения признаков для train / test / optuna.
+Функции для извлечения признаков из изображений.
 
-Функции:
-- is_image_path(Path) -> bool
-- image_to_feature(rgb_uint8) -> 1D numpy array
-- build_features(list_of_rgb_images) -> 2D numpy array (n_samples, n_features)
-- load_images_and_labels(data_dir) -> X_images_list, y_list  (удобно для train/optuna)
+Реализованы следующие типы признаков:
+- HOG (Histogram of Oriented Gradients);
+- моменты Ху (Hu Moments);
+- цветовые гистограммы в пространстве HSV.
+
+Итоговый вектор признаков формируется путём конкатенации всех перечисленных признаков
+и используется в классических алгоритмах машинного обучения.
 """
 
 from pathlib import Path
@@ -63,13 +66,11 @@ def extract_hog(gray_uint8: np.ndarray) -> np.ndarray:
 
 def image_to_feature(rgb_uint8: np.ndarray) -> np.ndarray:
     """
-    Унифицированная функция: вход RGB uint8 (H,W,3) -> 1D признаки.
-    Состав признаков:
-      - HOG (полное изображение)
-      - HOG (верхняя половина изображения)
-      - Hu moments (от бинаризованного изображения через Otsu)
-      - HSV histogram (16 bins per channel -> 48 values)
-    Возвращаем: numpy 1D (dtype float64)
+    Преобразует изображение в вектор признаков.
+
+    На вход принимает RGB-изображение.
+    На выходе возвращает одномерный numpy-вектор,
+    содержащий HOG, Hu-моменты и HSV-гистограммы.
     """
     # 1) серое
     gray = (rgb2gray(rgb_uint8) * 255).astype(np.uint8)
