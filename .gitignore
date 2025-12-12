@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+scripts/optuna_tune.py
+
+# Virtual environment
+.venv/
+
+# macOS
+.DS_Store
